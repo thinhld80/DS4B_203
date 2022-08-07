@@ -54,11 +54,53 @@ optins_day_tbl
 
 optins_day_tbl %>% tk_summary_diagnostics(.date_var = optin_time)
 
+# * Pad the Time Series
+
+optins_day_prepared_tbl <- optins_day_tbl %>%
+  pad_by_time(
+    .date_var  = optin_time,
+    .by        = "day",
+    .pad_value = 0
+  )
+
+optins_day_prepared_tbl
+
+# * Visualization
+
+optins_day_prepared_tbl %>%
+  plot_time_series(
+    .date_var = optin_time,
+    optins
+  )
+
 # 2.0 EVALUATION PERIOD ----
 
+# * Filtering ----
+
+evaluation_tbl <- optins_day_prepared_tbl %>%
+  filter_by_time(.date_var   = optin_time,
+                 .start_date = '2018-11-20',
+                 .end_date   = "end" )
 
 
+evaluation_tbl %>%
+  plot_time_series(optin_time, optins)
 
+
+# * Train/Test ----
+
+splits <- evaluation_tbl%>%
+  time_series_split(
+    date_var    = optin_time,
+    assess      = "8 week",
+    cumulative = TRUE
+                    )
+  
+splits
+
+splits %>%
+  tk_time_series_cv_plan() %>%
+  plot_time_series_cv_plan(optin_time, optins)
 
 # 3.0 PROPHET FORECASTING ----
 
