@@ -30,6 +30,7 @@ library(lubridate)
 
 mailchimp_users_tbl <- read_rds("00_data/mailchimp_users.rds")
 
+
 mailchimp_users_tbl
 
 # 1.0 EDA & DATA PREP ----
@@ -104,7 +105,38 @@ splits %>%
 
 # 3.0 PROPHET FORECASTING ----
 
+# * Prophet Model using Modeltiime/Parsnip
 
+model_prophet_fit <- prophet_reg() %>%
+  set_engine("prophet") %>%
+  fit(optins ~ optin_time, data = training(splits))
+
+
+model_prophet_fit
+
+# * Modeltime Process ----
+
+model_tbl <- modeltime_table(
+  model_prophet_fit
+)
+
+# * Calibration ----
+
+calibration_tbl <- model_tbl %>%
+  modeltime_calibrate(
+    new_data = testing(splits)
+  )
+
+
+# * Visualize Forecast ----
+
+calibration_tbl %>%
+  modeltime_forecast(actual_data = evaluation_tbl) %>%
+  plot_modeltime_forecast()
+
+# * Get Accuracy Metrics ----
+calibration_tbl %>%
+  modeltime_accuracy()
 
 
 # 4.0 FORECASTING WITH FEATURE ENGINEERING ----
