@@ -27,6 +27,22 @@ mailchimp_users_tbl
 
 # DATA PREPARATION ---- 
 
+google_analytics_long_hour_tbl <- google_analytics_tbl %>%
+  mutate(date = ymd_h(dateHour)) %>%
+  select(-dateHour) %>%
+  pivot_longer(cols = pageViews:sessions)
+
+google_analytics_long_tbl
+
+
+subscribers_day_tbl <- mailchimp_users_tbl %>%
+  summarise_by_time(.date_var = optin_time,
+                    .by       = "day",
+                    optins    = n()) %>%
+  pad_by_time(.date_var  = optin_time,
+              .by        = "day", 
+              .pad_value = 0)
+
 
 # 1.0 TIME SERIES PLOT ----
 # - Primary Visualization Tool
@@ -36,9 +52,23 @@ mailchimp_users_tbl
 
 # * Basics ----
 
+subscribers_day_tbl %>%
+  plot_time_series(optin_time, optins)
+
+google_analytics_long_hour_tbl %>%
+  plot_time_series(date, value)
 
 # * Facets/Groups ----
 
+google_analytics_long_hour_tbl %>%
+  plot_time_series(date, value, .color_var = name)
+
+google_analytics_long_hour_tbl %>%
+  group_by(name) %>%
+  plot_time_series(date, value)
+
+google_analytics_long_hour_tbl %>%
+  plot_time_series(date, value, .facet_vars = name)
 
 # * Mutations/Transformations ----
 
