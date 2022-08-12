@@ -106,7 +106,8 @@ google_analytics_long_hour_tbl %>%
 
 # * Static ggplot ----
 
-
+subscribers_day_tbl %>%
+  plot_time_series(optin_time, optins,.interactive = FALSE)
 
 
 
