@@ -32,7 +32,7 @@ google_analytics_long_hour_tbl <- google_analytics_tbl %>%
   select(-dateHour) %>%
   pivot_longer(cols = pageViews:sessions)
 
-google_analytics_long_tbl
+google_analytics_long_hour_tbl
 
 
 subscribers_day_tbl <- mailchimp_users_tbl %>%
@@ -72,9 +72,37 @@ google_analytics_long_hour_tbl %>%
 
 # * Mutations/Transformations ----
 
+subscribers_day_tbl %>%
+  plot_time_series(optin_time, log(optins + 1 ))
+
+
+google_analytics_long_hour_tbl %>%
+  group_by(name) %>%
+  plot_time_series(
+    .date_var = date,
+   # .value    = value
+    .value    = log(value +1)
+  )
 
 # * Smoother Adjustment
 
+subscribers_day_tbl %>%
+  plot_time_series(optin_time, log(optins + 1), .smooth = FALSE)
+
+
+subscribers_day_tbl %>%
+  plot_time_series(optin_time,
+                   log(optins +1),
+                   .smooth_span     = 0.25,
+                   #.smooth_period  = "90 days",
+                   .smooth_degree   = 1, 
+                   .smooth_message  = TRUE)
+
+
+
+google_analytics_long_hour_tbl %>%
+  group_by(name) %>%
+  plot_time_series(date, log(value + 1), .smooth = FALSE )
 
 # * Static ggplot ----
 
