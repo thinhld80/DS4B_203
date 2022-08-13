@@ -118,14 +118,27 @@ subscribers_day_tbl %>%
 # * ACF / PACF -----
 # - Date Features & Fourier Series 
 
-
+subscribers_day_tbl %>%
+  plot_acf_diagnostics(optin_time, log(optins +1), .lags = 25:100)
 
 # * CCF ----
 # - Lagged External Regressors
 
+ 
+google_analytics_day_tbl <- google_analytics_long_hour_tbl%>% 
+  pivot_wider(names_from = name, values_from = value ) %>%
+  summarize_by_time(.date_var = date, .by = "day", across(pageViews:sessions, .fns = sum))
+
+subscribers_ga_day_tbl <- subscribers_day_tbl %>%
+  left_join(google_analytics_day_tbl, by = c("optin_time" = "date"))
 
 
-
+subscribers_ga_day_tbl %>%
+  drop_na() %>%
+  plot_acf_diagnostics(optin_time, optins,
+                       .ccf_vars = pageViews:sessions,
+                       .show_ccf_vars_only = TRUE,
+                       .facet_ncol = 3)
 
 
 # 3.0 SEASONALITY ----
