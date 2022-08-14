@@ -146,7 +146,13 @@ subscribers_ga_day_tbl %>%
 
 ?plot_seasonal_diagnostics
 
-
+google_analytics_long_hour_tbl %>%
+  group_by(name) %>%
+  plot_seasonal_diagnostics(.date_var    = date,
+                            .value       = log(value + 1),
+                            .feature_set = c("hour", "wday.lbl"),
+                            .geom        = "violin"  
+                              )
 
 
 
