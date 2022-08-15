@@ -148,7 +148,8 @@ subscribers_ga_day_tbl %>%
 
 google_analytics_long_hour_tbl %>%
   group_by(name) %>%
-  plot_seasonal_diagnostics(.date_var    = date,
+  plot_seasonal_diagnostics(
+                            .date_var    = date,
                             .value       = log(value + 1),
                             .feature_set = c("hour", "wday.lbl"),
                             .geom        = "violin"  
@@ -162,7 +163,29 @@ google_analytics_long_hour_tbl %>%
 ?plot_anomaly_diagnostics
 
 
+subscribers_day_tbl %>%
+  plot_anomaly_diagnostics(
+    .date_var      = optin_time, 
+    .value         = optins,
+    .alpha         = 0.01,
+    .max_anomalies =  0.01)
 
+
+subscribers_day_tbl %>%
+  tk_anomaly_diagnostics(
+    .date_var      = optin_time, 
+    .value         = optins,
+    .alpha         = 0.01,
+    .max_anomalies =  0.01
+    ) 
+
+
+# Grouped Anomalies
+
+
+google_analytics_long_hour_tbl %>%
+  group_by(name) %>%
+  plot_anomaly_diagnostics(date, value)
 
 
 # 5.0 SEASONAL DECOMPOSITION ----
@@ -170,9 +193,22 @@ google_analytics_long_hour_tbl %>%
 
 ?plot_stl_diagnostics
 
+subscribers_day_tbl %>%
+  plot_stl_diagnostics(
+    .date_var  = optin_time,
+    .value     = log(optins +1),
+    .frequency = "1 month",
+    .trend     = "1 year"
+  )
 
+# Grouped 
 
-
+google_analytics_long_hour_tbl %>%
+  group_by(name) %>%
+  plot_stl_diagnostics(
+    .date_var = date,
+    .value    = log(value + 1) 
+  )
 
 # 6.0 TIME SERIES REGRESSION PLOT ----
 # - Finding features
