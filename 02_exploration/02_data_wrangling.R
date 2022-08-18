@@ -78,18 +78,37 @@ subscribers_weekly_tbl <- mailchimp_users_tbl %>%
 transactions_monthly_tbl <- transactions_tbl %>%
   summarise_by_time(purchased_at, .by = "month", revenue = sum(revenue))
 
+# Floor, Ceiling, Round
+transactions_tbl %>%
+  summarise_by_time(purchased_at,
+                    .by     = "1 month",
+                    revenue = sum(revenue),
+                    .type   = "round"
+                    )
+transactions_tbl %>%
+  summarise_by_time(purchased_at,
+                    .by     = "1 month",
+                    revenue = sum(revenue),
+                    .type   = "ceiling"
+  ) %>%
+  mutate(purchased_at = purchased_at %-time% "1 day")
+
+
 # 2.0 PAD BY TIME ----
 # - Filling in Gaps
 # - Going from Low to High Frequency (un-aggregating)
 
 # * Fill Daily Gaps ----
 
-
+subscribers_daily_tbl %>%
+  pad_by_time(.date_var = optin_time, .by = "day", .pad_value = 0, .start_date = "2018-06-01")
 
 
 # * Weekly to Daily ----
 
-
+transactions_tbl %>%
+  pad_by_time(.date_var = purchased_at, .by = "day", .start_date = "2018-06-01") %>%
+  mutate_by_time(.by = "week", revenue_spread = sum(revenue, na.rm =TRUE) / 7)
 
 
 
