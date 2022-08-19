@@ -117,12 +117,21 @@ transactions_tbl %>%
 
 # * Slicing - Everything after the BIG anomaly ----
 
+subscribers_daily_tbl %>%
+  filter_by_time(.start_date = "2018-11-20") %>%
+  plot_time_series(optin_time, optins) 
+
+
 
 # * Zooming In - Just December 2018 ----
-
+subscribers_daily_tbl %>%
+  filter_by_time(.start_date = "2019-12", .end_date = "2019") %>%
+  plot_time_series(optin_time, optins)
 
 # * Offsetting - Using plus-time and minus-time offsets to get things just right ----
-
+subscribers_daily_tbl %>%
+  filter_by_time(.start_date = "2019-12", .end_date = "2019-12-01" %+time% "4 weeks") %>%
+  plot_time_series(optin_time, optins)
 
 # 4.0 MUTATING BY TIME -----
 # - Get change from beginning/end of period
