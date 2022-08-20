@@ -34,7 +34,6 @@ mailchimp_users_tbl
 transactions_tbl  <- read_rds("00_data/transactions_weekly.rds")
 transactions_tbl 
 
-
 # 1.0 SUMMARIZE BY TIME  ----
 # - APPLY COMMON AGGREGATIONS
 # - HIGH TO LOW FREQ
@@ -44,7 +43,6 @@ transactions_tbl
 subscribers_daily_tbl <- mailchimp_users_tbl %>%
   summarise_by_time(
     optin_time, .by = "day", optins = n())
-
 
 
 mailchimp_users_tbl %>%
@@ -93,7 +91,6 @@ transactions_tbl %>%
   ) %>%
   mutate(purchased_at = purchased_at %-time% "1 day")
 
-
 # 2.0 PAD BY TIME ----
 # - Filling in Gaps
 # - Going from Low to High Frequency (un-aggregating)
@@ -103,14 +100,11 @@ transactions_tbl %>%
 subscribers_daily_tbl %>%
   pad_by_time(.date_var = optin_time, .by = "day", .pad_value = 0, .start_date = "2018-06-01")
 
-
 # * Weekly to Daily ----
 
 transactions_tbl %>%
   pad_by_time(.date_var = purchased_at, .by = "day", .start_date = "2018-06-01") %>%
   mutate_by_time(.by = "week", revenue_spread = sum(revenue, na.rm =TRUE) / 7)
-
-
 
 # 3.0 FILTER BY TIME ----
 # - Pare data down before modeling
@@ -120,8 +114,6 @@ transactions_tbl %>%
 subscribers_daily_tbl %>%
   filter_by_time(.start_date = "2018-11-20") %>%
   plot_time_series(optin_time, optins) 
-
-
 
 # * Zooming In - Just December 2018 ----
 subscribers_daily_tbl %>%
@@ -137,9 +129,16 @@ subscribers_daily_tbl %>%
 # - Get change from beginning/end of period
 
 # * First, Last, Mean, Median by Period ----
-
-
-
+transactions_tbl %>%
+  mutate_by_time(
+    .date_var      = purchased_at, 
+    .by            = "3 month",
+    revenue_mean   = mean(revenue),
+    revenue_median = median(revenue),
+    revenue_max    = max(revenue),
+    revenue_min    = min(revenue)) %>%
+  pivot_longer(contains("revenue")) %>%
+  plot_time_series(purchased_at, value, name, .smooth = FALSE)
 
 
 # 5.0 JOINING BY TIME ----
@@ -148,15 +147,44 @@ subscribers_daily_tbl %>%
 
 # * Subscribers + GA Summary Web Traffic ----
 
+subscribers_daily_padded_tbl <- subscribers_daily_tbl %>%
+  pad_by_time(.pad_value = 0, .start_date = "2018-06")
+
+google_analytics_summary_daily_tbl
+
+subscribers_google_joined_tbl <- subscribers_daily_padded_tbl %>%
+  left_join(google_analytics_summary_daily_tbl, by = c("optin_time" = "dateHour"))
 
 # * Inspect Join -----
+subscribers_google_joined_tbl %>% plot_missing()
 
+google_analytics_summary_daily_tbl %>% tk_summary_diagnostics()
+
+subscribers_google_joined_tbl %>% tk_summary_diagnostics()
+
+subscribers_google_joined_tbl %>%
+  pivot_longer(-optin_time) %>%
+  plot_time_series(optin_time, value, .color_var = name)
 
 # * Visualization Techniques (Relationships) ----
 
+log_standardized_subscribers_joined_tbl <- subscribers_google_joined_tbl %>%
+  drop_na() %>%
+  mutate(across(optins:sessions, .fns = log1p)) %>%
+  mutate(across(optins:sessions, .fns = standardize_vec))
 
+log_standardized_subscribers_joined_tbl %>%
+  pivot_longer(optins:sessions) %>%
+  plot_time_series(optin_time, value, name, .smooth = FALSE)
 
-
+log_standardized_subscribers_joined_tbl %>%
+  plot_acf_diagnostics(
+    optin_time,
+    optins,
+    .ccf_vars = pageViews:sessions,
+    .show_ccf_vars_only = TRUE
+    )
+  
 # 6.0 WORKING WITH THE INDEX ----
 # - Index Manipulations
 
