@@ -159,11 +159,30 @@ google_analytics_summary_long_tbl %>%
 
 # * Sliding / Rolling Functions ----
 
-
-
+google_analytics_summary_long_tbl %>%
+  mutate(value_roll_ = slidify_vec(value,
+                                   .f       = median,
+                                   .period  = 24 * 7, 
+                                   .align   = "center",
+                                   .partial = TRUE )) %>%
+  pivot_longer(contains("value"), names_repair = "unique") %>%
+  rename(names = `name...2`, names_2 = `name...3`) %>%
+  group_by(names) %>%
+  plot_time_series(date, value, .color_var = names_2, .smooth = FALSE)
+  
 # * LOESS smoother ----
 
-
+google_analytics_summary_long_tbl %>%
+  mutate(value_smooth = smooth_vec(value,
+                                   period  = 24 * 7,
+                                   #span   = 0.65,
+                                   degree  = 0
+                                   )) %>%
+  pivot_longer(contains("value"), names_repair = "unique") %>%
+  rename(names = `name...2`, names_2 = `name...3`) %>%
+  group_by(names) %>%
+  plot_time_series(date, value, .color_var = names_2, .smooth = FALSE)
+  
 
 # * Rolling Correlations ----
 # - Identify changing relationships
