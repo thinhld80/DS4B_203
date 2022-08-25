@@ -187,8 +187,22 @@ google_analytics_summary_long_tbl %>%
 # * Rolling Correlations ----
 # - Identify changing relationships
 
+cor(1:10,seq(from = 0, to = 20, length.out = 10))
 
+rolling_cor_24_7 <- slidify(
+  .f       = ~cor(.x, .y, use = "pairwise.complete.obs"),
+  .period  = 24 * 7,
+  .align   = "center",
+  .partial = FALSE
+)
 
+google_analytics_summary_tbl %>%
+  mutate(rolling_cor_pageviews_organic = rolling_cor_24_7(pageViews, organicSearches)) %>%
+  mutate(dateHour = ymd_h(dateHour)) %>%
+  select(-sessions) %>%
+  pivot_longer(-dateHour) %>%
+  group_by(name) %>%
+  plot_time_series(dateHour, value)
 
 # * Problem with Moving Avg Forecasting ----
 
