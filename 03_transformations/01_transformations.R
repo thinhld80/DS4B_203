@@ -206,10 +206,17 @@ google_analytics_summary_tbl %>%
 
 # * Problem with Moving Avg Forecasting ----
 
-
-
-
-
+transactions_tbl %>%
+  mutate(
+    mavg_8 = slidify_vec(revenue, .f = ~mean(.x, na.rm = TRUE), .period = 8, .align = "right")
+    ) %>%
+  bind_rows(
+    future_frame(., .length_out = 8)
+  ) %>%
+  fill(mavg_8, .direction = "down") %>%
+  pivot_longer(-purchased_at) %>%
+  plot_time_series(purchased_at, value, name, .smooth = FALSE)
+  
 # 3.0 RANGE REDUCTION ----
 # - Used in visualization to overlay series
 # - Used in ML for models that are affected by feature magnitude (e.g. linear regression)
@@ -217,12 +224,18 @@ google_analytics_summary_tbl %>%
 # * Normalize to Range (0,1) ----
 # - INFO: recipes::step_range() is actually normalization to range(0,1)
 
-
+google_analytics_summary_long_tbl %>%
+  mutate(value = normalize_vec(value)) %>%
+  ungroup() %>%
+  plot_time_series(date, value, name)
 
 # * Standardize to Mean = 0 (Center), SD = 1 (Scaling) -----
 # - INFO: recipes::step_normalize() is actually standardization to mean = 0, sd = 1
 
-
+google_analytics_summary_long_tbl %>%
+  mutate(value = standardize_vec(value)) %>%
+  ungroup() %>%
+  plot_time_series(date, value, name, .smooth = FALSE)
 
 
 # 4.0 IMPUTING & OUTLIER CLEANING ----
