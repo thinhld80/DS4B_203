@@ -246,18 +246,50 @@ google_analytics_summary_long_tbl %>%
 
 # * Imputation ----
 
+subscribers_daily_tbl %>%
+  mutate(optins_na = ifelse(optins == 0, NA, optins)) %>%
+  mutate(optins_imputed = ts_impute_vec(optins_na, period = 7)) %>%
+  pivot_longer(-optin_time) %>%
+  plot_time_series(optin_time, log1p(value), .color_var = name, .smooth = FALSE)
+
 
 # * Cleaning (Imputation + Outlier Removal) ----
 
+subscribers_daily_tbl %>%
+  plot_anomaly_diagnostics(optin_time, optins)
+
+subscribers_cleaned_daily_tbl <- subscribers_daily_tbl %>%
+  mutate(optins_na = ifelse(optins == 0, NA, optins)) %>%
+  mutate(optins_cleaned = ts_clean_vec(optins_na, period = 7))
+  
+  
+subscribers_cleaned_daily_tbl %>%    
+  pivot_longer(-optin_time) %>%
+  plot_time_series(optin_time, value, .color_var = name, .smooth = FALSE)
 
 
 # Outlier Effect - Before Cleaning
 
-
+subscribers_cleaned_daily_tbl %>%
+  plot_time_series_regression(
+    optin_time, 
+    .formula = log1p(optins) ~ as.numeric(optin_time) +
+      wday(optin_time, label = TRUE) +
+      month(optin_time, label = TRUE),
+    .show_summary = TRUE
+  )
+  
 
 # Outlier Effect - After Cleaning
 
-
+subscribers_cleaned_daily_tbl %>%
+  plot_time_series_regression(
+    optin_time, 
+    .formula = optins_cleaned ~ as.numeric(optin_time) +
+      wday(optin_time, label = TRUE) +
+      month(optin_time, label = TRUE),
+    .show_summary = TRUE
+  )
 
 
 # 5.0 LAGS & DIFFERENCING -----
