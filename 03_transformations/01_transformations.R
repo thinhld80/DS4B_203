@@ -319,8 +319,6 @@ subscribers_daily_tbl %>%
      .show_summary = TRUE
     )
   
-
-
 # * Differencing ----
 # - Makes a series "stationary"
 # - Used to get change
@@ -330,15 +328,28 @@ subscribers_daily_tbl %>%
 
 # Cumulative Sum & Differencing
 
-
+subscribers_daily_tbl %>%
+  mutate(total_optins = cumsum(optins)) %>%
+  mutate(optins_diff_1 = diff_vec(total_optins, lag = 1, difference = 1)) %>%
+  mutate(optins_diff_2 = diff_vec(total_optins, lag = 1, difference = 2)) %>%
+  pivot_longer(-optin_time) %>%
+  group_by(name) %>%
+  plot_time_series(optin_time, value, name, .smooth = FALSE)
 
 # Comparing Differences 
 
+google_analytics_summary_diff_tbl <- google_analytics_summary_tbl %>%
+  mutate(across(pageViews:sessions, .fns = diff_vec))
 
-
+google_analytics_summary_diff_tbl %>%
+  mutate(dateHour = ymd_h(dateHour)) %>%
+  pivot_longer(-dateHour) %>%
+  plot_time_series(dateHour, value, name, .smooth = FALSE)
+  
 # Inversion 
 
-
+google_analytics_summary_diff_tbl %>%
+  mutate(pageViews = diff_inv_vec(pageViews, initial_values = 79))
 
 
 # 6.0 FOURIER SERIES ----
