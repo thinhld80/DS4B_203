@@ -292,7 +292,7 @@ subscribers_cleaned_daily_tbl %>%
   )
 
 
-# 5.0 LAGS & DIFFERENCING -----
+ # 5.0 LAGS & DIFFERENCING -----
 # - Used to go from growth to change
 # - Makes a series "stationary" (potentially)
 # - MOST IMPORTANT - Can possibly use lagged variables in a model, if lags are correlated & 
@@ -302,6 +302,23 @@ subscribers_cleaned_daily_tbl %>%
 # - Autocorrelation
 # - 
 
+subscribers_daily_tbl %>%
+  mutate(optins_lag_1 = lag_vec(optins, lag = 2 ))
+
+subscribers_daily_tbl %>%
+  plot_acf_diagnostics(optin_time, log1p(optins))
+
+
+subscribers_daily_tbl %>%
+  tk_augment_lags(.value = optins, .lags = c(1, 2, 6, 14)) %>%
+  drop_na() %>%
+  plot_time_series_regression(
+    optin_time,
+    .formula = log1p(optins) ~ log1p(optins_lag1) + log1p(optins_lag2) + 
+      log1p(optins_lag6) + log1p(optins_lag14),
+     .show_summary = TRUE
+    )
+  
 
 
 # * Differencing ----
