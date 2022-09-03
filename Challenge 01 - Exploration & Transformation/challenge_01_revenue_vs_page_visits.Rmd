@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-    echo = TRUE,
+    echo    = TRUE,
     message = F,
     warning = F,
     # This should allow Rmarkdown to locate the data
@@ -61,6 +61,8 @@ google_analytics_by_page_tbl
 
 ```{r}
 # CODE HERE
+transactions_tbl %>%plot_time_series(.date_var = purchased_at, .value = revenue)
+#Time frequency is weekly.
 ```
 
 
@@ -75,6 +77,9 @@ There are 20 pages x 3 Metrics (pageViews, organicSearch, and sessions). To make
 
 ```{r, fig.height=7}
 # CODE HERE
+google_analytics_by_page_tbl %>%
+  group_by(pagePath) %>%
+  plot_time_series(.date_var = date, .value = sessions, .interactive = FALSE, .facet_ncol = 4)
 ```
 
 # Aggregation to Common Frequency
@@ -89,6 +94,12 @@ We need to aggregate both data sets to get them on a common frequency before we 
 
 ```{r}
 # CODE HERE
+transactions_weekly_tbl <- transactions_tbl %>%
+  summarise_by_time(
+    .date_var = purchased_at,
+    .by       = "week",
+    revenue   = sum(revenue)
+                    )
 ```
 ## Aggregate GA Page Sessions to Weekly
 
@@ -102,6 +113,18 @@ We need to aggregate both data sets to get them on a common frequency before we 
 
 ```{r}
 # CODE HERE
+product_pages_weekly_tbl <- google_analytics_by_page_tbl %>%
+  select(date, pagePath, sessions) %>%
+  group_by(pagePath) %>%
+  summarise_by_time(.by      = "week",
+                    sessions = sum(sessions)
+                    ) %>%
+  pivot_wider(
+    names_from = pagePath,
+    values_from = sessions,
+    names_prefix = "sessions_"
+    ) %>%
+  select(date, contains("/p"))
 ```
 
 # Join the Datasets
@@ -113,6 +136,8 @@ We need to aggregate both data sets to get them on a common frequency before we 
 
 ```{r}
 # CODE HERE
+transactions_product_page_sessions_weekly_tbl <- transactions_weekly_tbl %>%
+  left_join(product_pages_weekly_tbl, by = c("purchased_at" = "date") )
 ```
 
 ## Inspect Missing
@@ -121,6 +146,7 @@ We need to aggregate both data sets to get them on a common frequency before we 
 
 ```{r}
 # CODE HERE
+plot_missing(transactions_product_page_sessions_weekly_tbl)
 ```
 
 # Identify Relationships
@@ -140,6 +166,10 @@ transactions_product_page_sessions_weekly_tbl <-
 
 ```{r}
 # CODE HERE
+transactions_product_page_sessions_weekly_tbl %>%
+  pivot_longer(-purchased_at) %>%
+  group_by(name) %>%
+  plot_time_series(.date_var = purchased_at, .value = value, .facet_ncol = 3)
 ```
 
 ## Remove Columns with Too Much Missing
@@ -152,6 +182,8 @@ Several of the columns have a lot of missing data. These are pages that did not 
 
 ```{r}
 # CODE HERE
+transactions_product_page_subset_tbl <- transactions_product_page_sessions_weekly_tbl %>%
+  select(-contains("bundle"), -ends_with("with-r/"))
 ```
 
 ## Transform Data
@@ -165,6 +197,11 @@ Several of the columns have a lot of missing data. These are pages that did not 
 
 ```{r}
 # CODE HERE
+log_standardized_transactions_product_page_tbl <- transactions_product_page_subset_tbl %>%
+  drop_na() %>%
+  mutate(across(-purchased_at,log1p
+  )) %>%
+  mutate(across(-purchased_at, standardize_vec))
 ```
 
 ## Cross Correlations
@@ -180,6 +217,14 @@ Visualize cross correlations between revenue and anything that `contains("sessio
 
 ```{r}
 # CODE HERE
+log_standardized_transactions_product_page_tbl %>%
+  plot_acf_diagnostics(
+    .date_var           = purchased_at,
+    .value              = revenue,
+    .ccf_vars           = contains("session"),
+    .show_ccf_vars_only = TRUE,
+    .facet_ncol         = 2
+  )
 ```
 
 
@@ -187,9 +232,10 @@ Visualize cross correlations between revenue and anything that `contains("sessio
 # Results
 
 - What can you say about the relationship between 101 Course Page visits & revenue?
+# page visits go up as revenue goes up for about 2 weeks(2 lags)
 
 - What about the relationship between Jumpstart, Learning Labs PRO page visits and Revenue?
-
+# pagevisits go up as revenue goes up for a much longer time of up to 11-12 weeks(11-12 lags)
 
 
 
