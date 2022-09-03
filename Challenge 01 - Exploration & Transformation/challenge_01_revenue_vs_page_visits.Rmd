@@ -61,7 +61,8 @@ google_analytics_by_page_tbl
 
 ```{r}
 # CODE HERE
-transactions_tbl %>%plot_time_series(.date_var = purchased_at, .value = revenue)
+transactions_tbl %>%
+  plot_time_series(.date_var = purchased_at, .value = revenue)
 #Time frequency is weekly.
 ```
 
@@ -79,7 +80,12 @@ There are 20 pages x 3 Metrics (pageViews, organicSearch, and sessions). To make
 # CODE HERE
 google_analytics_by_page_tbl %>%
   group_by(pagePath) %>%
-  plot_time_series(.date_var = date, .value = sessions, .interactive = FALSE, .facet_ncol = 4)
+  plot_time_series(
+                   .date_var    = date,
+                   .value       = sessions,
+                   .interactive = FALSE,
+                   .facet_ncol  = 4
+    )
 ```
 
 # Aggregation to Common Frequency
@@ -116,15 +122,16 @@ transactions_weekly_tbl <- transactions_tbl %>%
 product_pages_weekly_tbl <- google_analytics_by_page_tbl %>%
   select(date, pagePath, sessions) %>%
   group_by(pagePath) %>%
-  summarise_by_time(.by      = "week",
+  summarise_by_time(
+                    .by      = "week",
                     sessions = sum(sessions)
                     ) %>%
   pivot_wider(
-    names_from = pagePath,
-    values_from = sessions,
+    names_from   = pagePath,
+    values_from  = sessions,
     names_prefix = "sessions_"
     ) %>%
-  select(date, contains("/p"))
+  select(date, contains("/p/"))
 ```
 
 # Join the Datasets
@@ -199,9 +206,9 @@ transactions_product_page_subset_tbl <- transactions_product_page_sessions_weekl
 # CODE HERE
 log_standardized_transactions_product_page_tbl <- transactions_product_page_subset_tbl %>%
   drop_na() %>%
-  mutate(across(-purchased_at,log1p
+  mutate(across(-purchased_at, .fns = log1p
   )) %>%
-  mutate(across(-purchased_at, standardize_vec))
+  mutate(across(-purchased_at, .fns = standardize_vec))
 ```
 
 ## Cross Correlations
@@ -235,7 +242,7 @@ log_standardized_transactions_product_page_tbl %>%
 # page visits go up as revenue goes up for about 2 weeks(2 lags)
 
 - What about the relationship between Jumpstart, Learning Labs PRO page visits and Revenue?
-# pagevisits go up as revenue goes up for a much longer time of up to 11-12 weeks(11-12 lags)
+# page visits go up as revenue goes up for a much longer time of up to 11-12 weeks(11-12 lags)
 
 
 
