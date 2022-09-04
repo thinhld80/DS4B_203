@@ -176,7 +176,10 @@ transactions_product_page_sessions_weekly_tbl <-
 transactions_product_page_sessions_weekly_tbl %>%
   pivot_longer(-purchased_at) %>%
   group_by(name) %>%
-  plot_time_series(.date_var = purchased_at, .value = value, .facet_ncol = 3)
+  plot_time_series(
+    .date_var   = purchased_at,
+    .value      = value,
+    .facet_ncol = 3)
 ```
 
 ## Remove Columns with Too Much Missing
