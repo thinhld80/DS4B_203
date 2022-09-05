@@ -62,14 +62,39 @@ data_prepared_tbl %>%
 
 # * Time Series Signature ----
 
+data_prep_signature_tbl <- data_prepared_tbl %>%
+  tk_augment_timeseries_signature() %>%
+  select(-diff, -contains(".iso"), -ends_with(".xts"),
+         -matches("(hour)|(minute)|(second)|(am.pm)"))
+
+data_prep_signature_tbl %>% glimpse()
 
 # * Trend-Based Features ----
 
 # ** Linear Trend
 
+data_prep_signature_tbl %>%
+  plot_time_series_regression(
+    .date_var = optin_time,
+    .formula  = optins_trans ~ index.num
+  )
 
 # ** Nonlinear Trend - Basis Splines
 
+data_prep_signature_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = optins_trans ~ splines::bs(index.num, degree = 3),
+    .show_summary = TRUE
+  )
+
+data_prep_signature_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = optins_trans ~ splines::ns(index.num, 
+                                               knots = quantile(index.num, c(0.25, 0.50))),
+    .show_summary = TRUE
+  )
 
 # * Seasonal Features ----
 
