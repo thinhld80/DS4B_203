@@ -100,15 +100,58 @@ data_prep_signature_tbl %>%
 
 # Weekly Seasonality
 
+data_prep_signature_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = optins_trans ~ wday.lbl,
+    .show_summary = TRUE
+  )
+
 
 # ** Monthly Seasonality
+
+data_prep_signature_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = optins_trans ~ month.lbl,
+    .show_summary = TRUE
+  )
+
 
 
 # ** Together with Trend
 
+model_formula_seasonality <- as.formula(
+  optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25, 0.50))) +
+  wday.lbl + month.lbl + .
+)
+
+data_prep_signature_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = model_formula_seasonality,
+    .show_summary = TRUE
+  )
+
 
 # 2.0 INTERACTIONS ----
 
+model_formula_interaction <- as.formula(
+  optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25, 0.50)))
+    + .
+    + (as.factor(week2) * wday.lbl)
+    
+)
+
+
+data_prep_signature_tbl %>% glimpse()
+
+data_prep_signature_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = model_formula_interaction,
+    .show_summary = TRUE
+  )
 
 
 # 3.0 FOURIER SERIES ----
