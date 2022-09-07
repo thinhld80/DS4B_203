@@ -159,11 +159,32 @@ data_prep_signature_tbl %>%
 
 # Data Prep
 
+data_prep_signature_tbl %>%
+  plot_acf_diagnostics(optin_time, optins_trans)
+
+data_prep_fourier_tbl <- data_prep_signature_tbl %>%
+  tk_augment_fourier(optin_time, .periods = c(7, 14, 30, 90, 365), .K = 2)
+
+data_prep_fourier_tbl %>% glimpse()
 
 # Model
 
+model_formula_fourier <- as.formula(
+  optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25, 0.50)))
+  + .
+  + (as.factor(week2) * wday.lbl)
+  
+)
 
 # Visualize
+
+data_prep_fourier_tbl %>%
+  filter_by_time(.start_date = "2018-09-13") %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = model_formula_fourier,
+    .show_summary = TRUE
+  )
 
 
 # 4.0 LAGS ----
@@ -171,16 +192,48 @@ data_prep_signature_tbl %>%
 
 # Data Prep
 
+data_prep_fourier_tbl %>%
+  plot_acf_diagnostics(
+    .date_var = optin_time,
+    .value    = optins_trans,
+    .lags     = (8 * 7 + 1):600
+  )
+
+data_prep_lags_tbl <- data_prep_fourier_tbl %>%
+  tk_augment_lags(
+    .value    = optins_trans,
+    .lags     = c(57, 63, 70)) %>%
+  drop_na()
+
+
+data_prep_lags_tbl %>% glimpse()
 
 # Model
 
+model_formula_lags <- as.formula(
+  optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25)))
+  + .
+  + (as.factor(week2) * wday.lbl)
+
+)
+
 
 # Visualize
+
+data_prep_lags_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = model_formula_lags,
+    .show_summary = TRUE
+  )
 
 
 # 5.0 SPECIAL EVENTS ----
 
 # Data Prep
+
+
+
 
 
 # Model
