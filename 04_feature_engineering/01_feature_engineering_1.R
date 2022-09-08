@@ -170,7 +170,7 @@ data_prep_fourier_tbl %>% glimpse()
 # Model
 
 model_formula_fourier <- as.formula(
-  optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25, 0.50)))
+  optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25, 0.40)))
   + .
   + (as.factor(week2) * wday.lbl)
   
@@ -232,11 +232,33 @@ data_prep_lags_tbl %>%
 
 # Data Prep
 
+learning_labs_daily_tbl <- learning_labs_tbl %>%
+  mutate(event_date = ymd_hms(event_date)) %>%
+  summarise_by_time(.date_var = event_date, .by = "day", event = n())
+  
+
+data_prep_events_tbl <- data_prep_fourier_tbl %>%
+  left_join(learning_labs_daily_tbl, by = c("optin_time" = "event_date")) %>%
+  mutate(event = ifelse(is.na(event), 0 , event))
+
+data_prep_events_tbl %>% glimpse()
 
 
+g <- data_prep_events_tbl %>%
+  plot_time_series(optin_time, optins_trans, .interactive = FALSE) +
+  geom_point(color = "red", data = . %>% filter(event == 1))
 
+
+ggplotly(g)
 
 # Model
+
+data_prep_events_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = model_formula_fourier,
+    .show_summary = TRUE
+    )
 
 
 # Visualize
