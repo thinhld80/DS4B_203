@@ -268,6 +268,27 @@ data_prep_events_tbl %>%
 
 # Data Prep
 
+google_analytics_prep_tbl <- google_analytics_summary_tbl %>%
+  mutate(date = ymd_h(dateHour)) %>%
+  summarise_by_time(.date_var = date, .by = "day", across(pageViews:sessions, .fns = sum)) %>%
+  mutate(across(pageViews:sessions, .fns = log1p)) %>%
+  mutate(across(pageViews:sessions, .fns = standardize_vec))
+
+google_analytics_prep_tbl
+
+data_prep_google_tbl <- data_prep_events_tbl %>%
+  left_join(google_analytics_prep_tbl, by = c("optin_time" = "date")) %>%
+  drop_na()
+
+data_prep_google_tbl %>% glimpse()
+
+data_prep_google_tbl %>%
+  plot_acf_diagnostics(
+    .date_var           = optin_time,
+    .value              = optins_trans,
+    .ccf_vars           = pageViews:sessions,
+    .show_ccf_vars_only = TRUE
+  )
 
 # Model
 
