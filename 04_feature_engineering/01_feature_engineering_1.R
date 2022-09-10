@@ -210,6 +210,7 @@ data_prep_lags_tbl %>% glimpse()
 
 # Model
 
+
 model_formula_lags <- as.formula(
   optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25)))
   + .
@@ -272,7 +273,8 @@ google_analytics_prep_tbl <- google_analytics_summary_tbl %>%
   mutate(date = ymd_h(dateHour)) %>%
   summarise_by_time(.date_var = date, .by = "day", across(pageViews:sessions, .fns = sum)) %>%
   mutate(across(pageViews:sessions, .fns = log1p)) %>%
-  mutate(across(pageViews:sessions, .fns = standardize_vec))
+  mutate(across(pageViews:sessions, .fns = standardize_vec)) %>%
+  mutate(pageViews_lag63 = lag_vec(pageViews, lag = 63))
 
 google_analytics_prep_tbl
 
@@ -292,8 +294,31 @@ data_prep_google_tbl %>%
 
 # Model
 
+model_formula_lags <- as.formula(
+  optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25)))
+  + .
+  + (as.factor(week2) * wday.lbl)
+  -pageViews - organicSearches - sessions
+  + pageViews_lag63
+  
+)
 
 # Visualize
+
+data_prep_google_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = model_formula_lags,
+    .show_summary = TRUE
+    )
+
+
+
+data_prep_google_tbl %>%
+  select(optin_time, optins_trans, pageViews) %>%
+  pivot_longer(-optin_time) %>%
+  plot_time_series(optin_time, value, name, .smooth = FALSE)
+  
 
 # 7.0 RECOMMENDATION ----
 # - Best model: 
