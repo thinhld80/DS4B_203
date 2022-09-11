@@ -324,3 +324,33 @@ data_prep_google_tbl %>%
 # - Best model: 
 # - Best Model Formula:
 
+
+
+model_formula_final <- as.formula(
+  optins_trans ~ splines::ns(index.num, knots = quantile(index.num, c(0.25)))
+  + .
+  + (as.factor(week2) * wday.lbl)
+  
+)
+
+
+# Visualize
+
+data_prep_events_tbl %>%
+  plot_time_series_regression(
+    .date_var     = optin_time,
+    .formula      = model_formula_final,
+    .show_summary = TRUE
+  )
+
+# Linear Regression Model
+
+model_fit_best_lm <- lm(model_formula_final, data = data_prep_events_tbl)
+
+model_fit_best_lm$terms %>% formula()
+
+write_rds(model_fit_best_lm, file= "00_models/model_fit_best_lm.rds")
+
+read_rds("00_models/model_fit_best_lm.rds") %>% summary()
+
+model_fit_best_lm$model
