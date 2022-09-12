@@ -56,6 +56,7 @@ subscribers_transformed_tbl <- subscribers_prep_tbl %>%
 
 subscribers_transformed_tbl
 
+
 # Save Key Params
 limit_lower <- 0
 limit_upper <- 3650.8
@@ -68,13 +69,66 @@ std_sd      <- 1.1109817111334
 # - Add any lags to full dataset
 # - Add any external regressors to full dataset
 
+horizon <- 8 * 7
+lag_period <- 56
+rolling_periods <- c(30, 60, 90) 
 
+subscribers_transformed_tbl
+
+data_prepared_full_tbl <- subscribers_transformed_tbl %>%
+  bind_rows(
+    future_frame(.data = ., .date_var = optin_time, .length_out = horizon)
+  ) %>%
+  
+  # Add Autocorrelated Lags
+  tk_augment_lags(optins_trans, .lags = lag_period) %>%
+  
+  # Add Rolling Features
+  tk_augment_slidify(
+    .value   = optins_trans_lag56,
+    .f       = mean,
+    .period  = rolling_periods,
+    .align   = "center",
+    .partial = TRUE
+      ) %>%
+  
+  # Add Events
+  left_join(learning_labs_prep_tbl, by = c("optin_time" = "event_date")) %>%
+  mutate(event = ifelse(is.na(event), 0, event)) %>%
+  
+  # Format Columns
+  rename(lab_event = event) %>%
+  rename_with(.fn = ~str_c("lag_", .), .cols = contains("lag"))
+
+
+
+data_prepared_full_tbl %>%
+  pivot_longer(-optin_time) %>%
+  plot_time_series(optin_time, value, name, .smooth = FALSE)
+
+
+data_prepared_full_tbl %>% tail(8 * 7 + 1)
 
 # 2.0 STEP 2 - SEPARATE INTO MODELING & FORECAST DATA ----
 
+data_prepared_full_tbl %>% tail(57)
+  
+data_prepared_tbl <- data_prepared_full_tbl %>%
+  filter(!is.na(optins_trans))
+data_prepared_tbl
 
+forecast_tbl <- data_prepared_full_tbl %>%
+  filter(is.na(optins_trans))
+
+forecast_tbl
 
 # 3.0 TRAIN/TEST (MODEL DATASET) ----
+
+splits <- data_prepared_tbl %>% time_series_split(assess = horizon, cumulative = TRUE)
+
+splits %>%
+  tk_time_series_cv_plan() %>%
+  plot_time_series_cv_plan(optin_time, optins_trans)
 
 
 
