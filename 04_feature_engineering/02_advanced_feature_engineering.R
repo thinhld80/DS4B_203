@@ -138,7 +138,31 @@ splits %>%
 # - Interaction: wday.lbl:week2
 # - Fourier Features
 
+model_fit_best_lm <- read_rds("00_models/model_fit_best_lm.rds")
 
+model_fit_best_lm %>% summary()
+
+model_fit_best_lm$terms %>% formula()
+
+recipe_spec_base <- recipe(formula = optins_trans ~ ., data = training(splits)) %>%
+  
+  # Time Series Signature
+  step_timeseries_signature(optin_time) %>%
+  step_rm(matches("(iso)|(xts)|(hour)|(minute)|(second)|(am.pm)")) %>%
+  
+  #Standardization
+  step_normalize(matches("(index.num)|(year)|(yday)")) %>%
+  
+  #Dummy Encoding(One Hot Encoding)
+  step_dummy(all_nominal(), one_hot = TRUE) %>%
+  
+  #Interaction Features
+  step_interact(terms = ~matches("week2") * matches("wday.lbl")) %>%
+  
+  #Fourier
+  step_fourier(optin_time, period = c(7,14, 30, 90, 365), K = 2) 
+
+recipe_spec_base %>% prep() %>% juice() %>% glimpse()
 
 # 5.0 SPLINE MODEL ----
 
