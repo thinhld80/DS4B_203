@@ -115,6 +115,7 @@ data_prepared_full_tbl %>% tail(57)
   
 data_prepared_tbl <- data_prepared_full_tbl %>%
   filter(!is.na(optins_trans))
+
 data_prepared_tbl
 
 forecast_tbl <- data_prepared_full_tbl %>%
@@ -168,28 +169,82 @@ recipe_spec_base %>% prep() %>% juice() %>% glimpse()
 
 # * LM Model Spec ----
 
+model_spec_lm <- linear_reg() %>%
+  set_engine("lm")
 
 # * Spline Recipe Spec ----
 
+recipe_spec_1 <- recipe_spec_base %>%
+  step_rm(optin_time) %>%
+  step_ns(ends_with("index.num"), deg_free = 2 ) %>%
+  step_rm(starts_with("lag_"))
+
+recipe_spec_1 %>% prep() %>% juice() %>% glimpse()
+ 
 
 # * Spline Workflow  ----
 
+workflow_fit_lm_1_spline <- workflow() %>%
+  add_model(model_spec_lm) %>%
+  add_recipe(recipe_spec_1) %>%
+  fit(training(splits))
+
+workflow_fit_lm_1_spline %>% extract_fit_parsnip() %>% pluck("fit") %>% summary()
 
 # 6.0 MODELTIME  ----
 
+calibration_tbl <- modeltime::modeltime_table(
+  workflow_fit_lm_1_spline
+) %>%
+  modeltime_calibrate(new_data = testing(splits))
+
+calibration_tbl %>%
+  modeltime_forecast(new_data    = testing(splits),
+                     actual_data = data_prepared_tbl) %>%
+  plot_modeltime_forecast()
+
+calibration_tbl %>% modeltime_accuracy()
 
 
 # 7.0 LAG MODEL ----
 
 # * Lag Recipe ----
 
+recipe_spec_base %>% prep() %>% juice() %>% glimpse()
+
+recipe_spec_2 <- recipe_spec_base %>%
+  step_rm(optin_time) %>%
+  step_naomit(starts_with("lag_"))
+
+recipe_spec_2 %>% prep() %>% juice() %>% glimpse()
 
 # * Lag Workflow ----
 
+workflow_fit_lm_2_lag <- workflow() %>%
+  add_model(model_spec_lm) %>%
+  add_recipe(recipe_spec_2) %>%
+  fit(training(splits))
+
+
+workflow_fit_lm_2_lag
+
+workflow_fit_lm_2_lag %>% extract_fit_parsnip() %>% pluck("fit") %>% summary()
 
 # * Compare with Modeltime -----
 
+calibration_tbl <- modeltime_table(
+  workflow_fit_lm_1_spline,
+  workflow_fit_lm_2_lag
+) %>%
+  modeltime_calibrate(new_data = testing(splits))
 
+calibration_tbl %>%
+  modeltime_forecast(new_data    = testing(splits),
+                     actual_data = data_prepared_tbl) %>% 
+  plot_modeltime_forecast()
+
+calibration_tbl %>%
+  modeltime_accuracy()
 
 # 8.0 FUTURE FORECAST ----
 
