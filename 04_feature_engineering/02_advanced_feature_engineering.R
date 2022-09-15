@@ -172,12 +172,17 @@ recipe_spec_base %>% prep() %>% juice() %>% glimpse()
 model_spec_lm <- linear_reg() %>%
   set_engine("lm")
 
+# OPTIONAL FIX----
+model_spec_lm <- linear_reg(penalty = 0.01) %>%
+  set_engine("glmnet")
+
 # * Spline Recipe Spec ----
 
 recipe_spec_1 <- recipe_spec_base %>%
   step_rm(optin_time) %>%
   step_ns(ends_with("index.num"), deg_free = 2 ) %>%
   step_rm(starts_with("lag_"))
+
 
 recipe_spec_1 %>% prep() %>% juice() %>% glimpse()
  
@@ -190,6 +195,7 @@ workflow_fit_lm_1_spline <- workflow() %>%
   fit(training(splits))
 
 workflow_fit_lm_1_spline %>% extract_fit_parsnip() %>% pluck("fit") %>% summary()
+
 
 # 6.0 MODELTIME  ----
 
@@ -248,7 +254,26 @@ calibration_tbl %>%
 
 # 8.0 FUTURE FORECAST ----
 
+refit_tbl <- calibration_tbl %>%
+  modeltime_refit(data = data_prepared_tbl)
 
+refit_tbl %>% modeltime_forecast(new_data    = forecast_tbl,
+                                 actual_data = data_prepared_tbl) %>%
+  
+  mutate(across(.value:.conf_hi, .fns = ~ standardize_inv_vec(
+    x    = .,
+    mean = std_mean, 
+    sd   = std_sd
+  ))) %>%
+  mutate(across(.value:.conf_hi, .fns =  ~ log_interval_inv_vec(
+    x           = .,
+    limit_lower = limit_lower,
+    limit_upper = limit_upper,
+    offset      = offset
+  ))) %>%
+  
+  # Invert Transformation
+  plot_modeltime_forecast()
 
 # 9.0 SAVE ARTIFACTS ----
 
