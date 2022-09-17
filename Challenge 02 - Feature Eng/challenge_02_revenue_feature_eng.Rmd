@@ -79,7 +79,12 @@ Our objectives are to:
 
 ```{r}
 # YOUR CODE HERE
-
+transactions_weekly_tbl <- transactions_tbl %>%
+  summarize_by_time(
+                    .date_var = purchased_at,
+                    .by       = "week",
+                     revenue  = sum(revenue)
+                    )
 ```
 
 
@@ -101,7 +106,22 @@ Our objectives are to:
 
 ```{r}
 # YOUR CODE HERE
-
+product_events_weekly_tbl <- product_events_tbl %>%
+  add_column(event_val = 1) %>%
+  group_by(event) %>%
+  summarise_by_time(
+    .date_var  = date,
+    .by        = "week",
+    event_val  = sum(event_val)
+    ) %>%
+  ungroup() %>%
+  pivot_wider(
+    names_from   = event,
+    values_from  = event_val,
+    values_fill  = 0,
+    names_prefix = "event_"
+    ) %>%
+  janitor::clean_names()
 ```
 
 # Visualizations
@@ -115,7 +135,12 @@ Use `plot_time_series()` to visualize the revenue.
 
 ```{r}
 # YOUR CODE HERE
-
+transactions_weekly_tbl %>%
+  plot_time_series(
+    .date_var = purchased_at,
+    .value    = log(revenue),
+    .smooth   = FALSE
+    )
 ```
 
 ## Visualize ACF
@@ -127,7 +152,11 @@ Visualize the ACF using `plot_acf_diagnostics()` using a `log()` transformation.
 
 ```{r}
 # YOUR CODE HERE
-
+transactions_weekly_tbl %>%
+  plot_acf_diagnostics(
+                       .date_var = purchased_at,
+                       .value    = log(revenue)
+                       )
 ```
 
 
@@ -141,14 +170,18 @@ Visualize the ACF using `plot_acf_diagnostics()` using a `log()` transformation.
 
 ```{r, message = TRUE}
 # YOUR CODE HERE
-
+transactions_trans_weekly_tbl <- transactions_weekly_tbl %>%
+  mutate(revenue_log   = log(revenue)) %>%
+  mutate(revenue_trans = standardize_vec(revenue_log))
+  
 ```
 
 Save the mean and standard deviation as `std_mean` and `std_sd`. We'll need this for inverting.
 
 ```{r}
 # YOUR CODE HERE
-
+std_mean <- 11.2910425517621
+std_sd   <- 0.655408027721517
 ```
 
 
@@ -156,7 +189,11 @@ Visualize the log-standardized transactions using `plot_time_series()`. This con
 
 ```{r}
 # YOUR CODE HERE
-
+transactions_trans_weekly_tbl %>%
+  plot_time_series(
+                   .date_var = purchased_at,
+                   .value    = revenue_trans
+                   )
 ```
 
 # Create Full Data Set
@@ -167,16 +204,16 @@ Visualize the log-standardized transactions using `plot_time_series()`. This con
 # list(std_mean = std_mean, std_sd = std_sd) %>% write_rds("challenge_02_data_checkpoints/standardize_params.rds")
 
 # Checkpoint data
-product_events_weekly_tbl     <- read_rds("challenge_02_data_checkpoints/product_events_weekly_tbl.rds")
-transactions_trans_weekly_tbl <- read_rds("challenge_02_data_checkpoints/transactions_trans_weekly_tbl.rds")
-standardize_params            <- read_rds("challenge_02_data_checkpoints/standardize_params.rds")
-
-std_mean <- standardize_params$std_mean
-std_sd   <- standardize_params$std_sd
+# product_events_weekly_tbl     <- read_rds("challenge_02_data_checkpoints/product_events_weekly_tbl.rds")
+# transactions_trans_weekly_tbl <- read_rds("challenge_02_data_checkpoints/transactions_trans_weekly_tbl.rds")
+# standardize_params            <- read_rds("challenge_02_data_checkpoints/standardize_params.rds")
+# 
+# std_mean <- standardize_params$std_mean
+# std_sd   <- standardize_params$std_sd
 ```
 
 
-We'll use these parameters to create our "full dataset". We've selecte an 8-week forecast horizon. Our lag period is 8 weeks and we'll try out a few rolling averages at various aggregations. 
+We'll use these parameters to create our "full dataset". We've selected an 8-week forecast horizon. Our lag period is 8 weeks and we'll try out a few rolling averages at various aggregations. 
 
 ```{r}
 horizon         <- 8
@@ -192,7 +229,7 @@ Next, join the aggregated weekly transactions revenue data and the product event
 1. Start with `transactions_trans_weekly_tbl`
 2. __Add the future window:__ Use `bind_rows()` and `future_frame()` to extend the data frame `.length_out = horizon`.
 3. __Add autocorrelated lags:__ Use `tk_augment_lags()` to add a `.lags = lag_period`
-4. __Add rolling features from our lag__: Use `tk_agument_slidify()` to add `.period = rolling_periods`. Use `mean` as the rolling function. Make sure to "center" with "partial" windows. 
+4. __Add rolling features from our lag__: Use `tk_augment_slidify()` to add `.period = rolling_periods`. Use `mean` as the rolling function. Make sure to "center" with "partial" windows. 
 5. __Add events__:
     - Left join `product_events_weekly_tbl`
     - Fill in the missing values with zero for any column that start with "event_"
@@ -202,7 +239,29 @@ Next, join the aggregated weekly transactions revenue data and the product event
 
 ```{r}
 # YOUR CODE HERE
-
+full_tbl <- transactions_trans_weekly_tbl %>%
+  bind_rows(
+    future_frame(
+      .data       = .,
+      .date_var   = purchased_at,
+      .length_out = horizon
+      )
+  ) %>%
+  tk_augment_lags(
+    .value = revenue_trans,
+    .lags  = lag_period
+    ) %>%
+  tk_augment_slidify(
+    .value   = revenue_trans_lag8,
+    .period  = rolling_periods,
+    .f       = mean,
+    .align   = "center",
+    .partial = TRUE
+  ) %>%
+  left_join(product_events_weekly_tbl, by = c("purchased_at" = "date")) %>%
+  mutate(across(starts_with("event"), .fns = ~replace_na(.x, 0))) %>% 
+  rename_with(.cols = contains("lag"), .fn = ~str_c("lag_", .)) %>%
+  select(-revenue, -revenue_log)
 ```
 
 ## Visualize the Full Data
@@ -221,7 +280,14 @@ Review the visualization selecting one feature at a time and answering the follo
 
 ```{r}
 # YOUR CODE HERE
-
+full_tbl %>%
+  pivot_longer(-purchased_at) %>%
+  plot_time_series(
+    .date_var  = purchased_at,
+    .value     = value,
+    .color_var = name ,
+    .smooth    = FALSE
+  )
 ```
 
 # Model Data / Forecast Data Split
@@ -230,21 +296,23 @@ Review the visualization selecting one feature at a time and answering the follo
 # full_tbl %>% write_rds("challenge_02_data_checkpoints/full_tbl.rds")
 
 # Checkpoint data
-full_tbl <- read_rds("challenge_02_data_checkpoints/full_tbl.rds")
+#full_tbl <- read_rds("challenge_02_data_checkpoints/full_tbl.rds")
 ```
 
 Create a `data_prepared_tbl` by filtering `full_tbl` where "revenue" is non-missing. 
 
 ```{r}
 # YOUR CODE HERE
-
+data_prepared_tbl <- full_tbl %>%
+  filter(!is.na(revenue_trans))
 ```
 
 Create a `forecast_tbl` by filtering `full_tbl` where "revenue" is missing. 
 
 ```{r}
 # YOUR CODE HERE
-
+forecast_tbl <- full_tbl %>%
+  filter(is.na(revenue_trans))
 ```
 
 
@@ -255,8 +323,8 @@ Create a `forecast_tbl` by filtering `full_tbl` where "revenue" is missing.
 # forecast_tbl %>% write_rds("challenge_02_data_checkpoints/forecast_tbl.rds")
 
 # Checkpoint data
-data_prepared_tbl <- read_rds("challenge_02_data_checkpoints/data_prepared_tbl.rds")
-forecast_tbl      <- read_rds("challenge_02_data_checkpoints/forecast_tbl.rds")
+# data_prepared_tbl <- read_rds("challenge_02_data_checkpoints/data_prepared_tbl.rds")
+# forecast_tbl      <- read_rds("challenge_02_data_checkpoints/forecast_tbl.rds")
 ```
 
 
@@ -270,7 +338,11 @@ forecast_tbl      <- read_rds("challenge_02_data_checkpoints/forecast_tbl.rds")
 
 ```{r}
 # YOUR CODE HERE
-
+splits <- data_prepared_tbl %>%
+  time_series_split(
+                       assess  = horizon,
+                    cumulative = TRUE
+                    )
 ```
 
 
@@ -301,7 +373,12 @@ Make a preprocessing recipe using `recipe()`. Note - It may help to `prep()` and
 
 ```{r}
 # YOUR CODE HERE
-
+recipe_spec_base <- recipe(revenue_trans ~ ., data = training(splits)) %>%
+  step_timeseries_signature(purchased_at) %>% 
+  step_rm(matches("(.iso)|(.xts)|(day)|(hour)|(minute)|(second)|(am.pm)")) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%
+  step_fourier(purchased_at, period = c(4, 20), K = 2) #%>% prep() %>% juice() %>% glimpse()
 ```
 
 
@@ -319,7 +396,7 @@ recipe_spec_base <- read_rds("challenge_02_data_checkpoints/recipe_spec_base.rds
 
 ### Visualize
 
-Use `plot_time_series_regression` to test out several natural splies:
+Use `plot_time_series_regression` to test out several natural splines:
 
 - Use .formula to try out `splines::ns()` with degrees of freedom 1, 2, 3, and 4. 
 
@@ -327,7 +404,11 @@ Which value of `df` would you select?
 
 ```{r}
 # YOUR CODE HERE
-
+training(splits) %>%
+  plot_time_series_regression(
+    .date_var = purchased_at,
+    .formula  = revenue_trans ~ splines::ns(x = purchased_at, df = 1)
+    )
 ```
 
 
@@ -341,7 +422,8 @@ Create a model specification for linear regression:
 
 ```{r}
 # YOUR CODE HERE
-
+model_spec_lm <- linear_reg() %>%
+  set_engine("lm")
 ```
 
 ### Recipe Spec - Spline
