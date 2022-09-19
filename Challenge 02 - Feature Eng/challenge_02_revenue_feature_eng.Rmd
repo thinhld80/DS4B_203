@@ -353,7 +353,7 @@ splits <- data_prepared_tbl %>%
 # write_rds(splits, "challenge_02_data_checkpoints/splits.rds")
 
 # Checkpoint data
-splits <- read_rds("challenge_02_data_checkpoints/splits.rds")
+#splits <- read_rds("challenge_02_data_checkpoints/splits.rds")
 ```
 
 ## Create a Preprocessing recipe
@@ -375,10 +375,10 @@ Make a preprocessing recipe using `recipe()`. Note - It may help to `prep()` and
 # YOUR CODE HERE
 recipe_spec_base <- recipe(revenue_trans ~ ., data = training(splits)) %>%
   step_timeseries_signature(purchased_at) %>% 
-  step_rm(matches("(.iso)|(.xts)|(day)|(hour)|(minute)|(second)|(am.pm)")) %>%
+  step_rm(matches("(iso)|(xts)|(day)|(hour)|(minute)|(second)|(am.pm)")) %>%
   step_normalize(all_numeric_predictors()) %>%
   step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%
-  step_fourier(purchased_at, period = c(4, 20), K = 2) #%>% prep() %>% juice() %>% glimpse()
+  step_fourier(purchased_at, period = c(4, 20), K = 2)
 ```
 
 
@@ -388,7 +388,7 @@ recipe_spec_base <- recipe(revenue_trans ~ ., data = training(splits)) %>%
 # write_rds(recipe_spec_base, "challenge_02_data_checkpoints/recipe_spec_base.rds")
 
 # Checkpoint data
-recipe_spec_base <- read_rds("challenge_02_data_checkpoints/recipe_spec_base.rds")
+#recipe_spec_base <- read_rds("challenge_02_data_checkpoints/recipe_spec_base.rds")
 ```
 
 
@@ -404,10 +404,12 @@ Which value of `df` would you select?
 
 ```{r}
 # YOUR CODE HERE
-training(splits) %>%
+recipe_spec_base  %>% 
+  prep() %>%
+  juice() %>%
   plot_time_series_regression(
     .date_var = purchased_at,
-    .formula  = revenue_trans ~ splines::ns(x = purchased_at, df = 1)
+    .formula  = revenue_trans ~ splines::ns(x =purchased_at_index.num, df = 3)
     )
 ```
 
@@ -422,8 +424,8 @@ Create a model specification for linear regression:
 
 ```{r}
 # YOUR CODE HERE
-model_spec_lm <- linear_reg() %>%
-  set_engine("lm")
+model_spec_lm <- linear_reg(penalty = 0.01) %>%
+  set_engine("glm")
 ```
 
 ### Recipe Spec - Spline
@@ -439,7 +441,9 @@ Create a recipe for the spline model.
 
 ```{r}
 # YOUR CODE HERE
-
+recipe_spec_1_spline <- recipe_spec_base %>%
+  step_rm(purchased_at,starts_with("lag_")) %>%
+  step_ns(purchased_at_index.num, deg_free = 3)
 ```
 
 
@@ -455,24 +459,29 @@ Create a workflow for the linear regression and preprocessing recipe:
 
 ```{r}
 # YOUR CODE HERE
-
+workflow_fit_lm_1_spline <- workflow() %>%
+  add_model(model_spec_lm) %>%
+  add_recipe(recipe_spec_1_spline) %>%
+  fit(data = training(splits))
 ```
 
 ## Rolling Lag Model
 
 ### Recipe Spec - Lag
 
-Create a recipe for the spline model. 
+Create a recipe for the lag model. 
 
 1. Start with `recipe_spec_base`
 2. Add a step to remove the "purchased_at" feature. We don't need this for LM models. 
 3. Remove missing values in any column that starts with "lag_"
-4. Store your updated recipe as `recipe_spec_1_spline`
+4. Store your updated recipe as `recipe_spec_1_lag`
 5. Glimpse the output. Were the features adjusted correctly?
 
 ```{r}
 # YOUR CODE HERE
-
+recipe_spec_1_lag <- recipe_spec_base %>%
+  step_rm(purchased_at) %>%
+  step_naomit(starts_with("lag_"))
 ```
 
 ### Workflow - Lag
@@ -481,7 +490,10 @@ Save the workflow as `workflow_fit_lm_2_lag`.
 
 ```{r}
 # YOUR CODE HERE
-
+workflow_fit_lm_2_lag <- workflow() %>%
+  add_model(model_spec_lm) %>%
+  add_recipe(recipe_spec_1_lag) %>%
+  fit(data = training(splits))
 ```
 
 # Modeltime
@@ -491,8 +503,8 @@ Save the workflow as `workflow_fit_lm_2_lag`.
 # write_rds(workflow_fit_lm_2_lag, "challenge_02_data_checkpoints/workflow_fit_lm_2_lag.rds")
 
 # Checkpoint data
-workflow_fit_lm_1_spline <- read_rds("challenge_02_data_checkpoints/workflow_fit_lm_1_spline.rds")
-workflow_fit_lm_2_lag    <- read_rds("challenge_02_data_checkpoints/workflow_fit_lm_2_lag.rds")
+#workflow_fit_lm_1_spline <- read_rds("challenge_02_data_checkpoints/workflow_fit_lm_1_spline.rds")
+#workflow_fit_lm_2_lag    <- read_rds("challenge_02_data_checkpoints/workflow_fit_lm_2_lag.rds")
 ```
 
 ### Make a Modeltime Table
@@ -504,7 +516,7 @@ Start by making a modeltime table:
 
 ```{r}
 # YOUR CODE HERE
-
+model_tbl <- modeltime_table(workflow_fit_lm_2_lag, workflow_fit_lm_1_spline)
 ```
 
 As a precautionary measure, please refit the models using `modeltime_refit()`. This prevents models that can go bad over time because of software changes. 
@@ -526,7 +538,8 @@ Use testing data to calibrate the model:
 
 ```{r}
 # YOUR CODE HERE
-
+calibration_tbl <- model_tbl %>%
+  modeltime_calibrate(new_data = testing(splits))
 ```
 
 ### Calculate the Accuracy
@@ -535,7 +548,8 @@ Use `modeltime_accuracy()` to calculate the accuracy metrics.
 
 ```{r}
 # YOUR CODE HERE
-
+calibration_tbl %>%
+  modeltime_accuracy()
 ```
 
 ### Visualize the Model Forecast
@@ -547,7 +561,8 @@ Use `modeltime_accuracy()` to calculate the accuracy metrics.
 
 ```{r}
 # YOUR CODE HERE
-
+modeltime_forecast(object = model_tbl ,new_data = testing(splits), actual_data = data_prepared_tbl) %>%
+  plot_modeltime_forecast()
 ```
 
 
@@ -562,7 +577,7 @@ Forecasting thoughts:
 # write_rds(calibration_tbl, "challenge_02_data_checkpoints/calibration_tbl.rds")
 
 # Checkpoint data
-calibration_tbl <- read_rds("challenge_02_data_checkpoints/calibration_tbl.rds")
+#calibration_tbl <- read_rds("challenge_02_data_checkpoints/calibration_tbl.rds")
 ```
 
 
@@ -573,7 +588,8 @@ calibration_tbl <- read_rds("challenge_02_data_checkpoints/calibration_tbl.rds")
 
 ```{r}
 # YOUR CODE HERE
-
+refit_tbl <- calibration_tbl %>%
+  modeltime_refit(data_prepared_tbl)
 ```
 
 
@@ -585,7 +601,9 @@ calibration_tbl <- read_rds("challenge_02_data_checkpoints/calibration_tbl.rds")
 
 ```{r}
 # YOUR CODE HERE
-
+refit_tbl %>%
+  modeltime_forecast(new_data = forecast_tbl, actual_data = data_prepared_tbl) %>%
+  plot_modeltime_forecast()
 ```
 
 ## Invert Transformation
@@ -597,7 +615,14 @@ Apply the inversion to the forecast plot:
 
 ```{r}
 # YOUR CODE HERE
-
+refit_tbl %>%
+  modeltime_forecast(
+    new_data    = forecast_tbl,
+    actual_data = data_prepared_tbl
+    ) %>%
+  mutate(across(.value:.conf_hi, ~standardize_inv_vec(., mean = std_mean, sd = std_sd))) %>%
+  mutate(across(.value:.conf_hi, ~exp(.))) %>%
+  plot_modeltime_forecast()
 ```
 
 
