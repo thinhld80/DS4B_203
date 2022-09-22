@@ -262,6 +262,8 @@ full_tbl <- transactions_trans_weekly_tbl %>%
   mutate(across(starts_with("event"), .fns = ~replace_na(.x, 0))) %>% 
   rename_with(.cols = contains("lag"), .fn = ~str_c("lag_", .)) %>%
   select(-revenue, -revenue_log)
+
+full_tbl %>% glimpse()
 ```
 
 ## Visualize the Full Data
@@ -305,6 +307,7 @@ Create a `data_prepared_tbl` by filtering `full_tbl` where "revenue" is non-miss
 # YOUR CODE HERE
 data_prepared_tbl <- full_tbl %>%
   filter(!is.na(revenue_trans))
+data_prepared_tbl
 ```
 
 Create a `forecast_tbl` by filtering `full_tbl` where "revenue" is missing. 
@@ -313,6 +316,7 @@ Create a `forecast_tbl` by filtering `full_tbl` where "revenue" is missing.
 # YOUR CODE HERE
 forecast_tbl <- full_tbl %>%
   filter(is.na(revenue_trans))
+forecast_tbl
 ```
 
 
@@ -378,7 +382,9 @@ recipe_spec_base <- recipe(revenue_trans ~ ., data = training(splits)) %>%
   step_rm(matches("(iso)|(xts)|(day)|(hour)|(minute)|(second)|(am.pm)")) %>%
   step_normalize(all_numeric_predictors()) %>%
   step_dummy(all_nominal_predictors(), one_hot = TRUE) %>%
-  step_fourier(purchased_at, period = c(4, 20), K = 2)
+  step_fourier(purchased_at, period = c(4, 52/2, 52), K = 2)
+
+recipe_spec_base %>% prep() %>% juice() %>% glimpse()
 ```
 
 
@@ -404,12 +410,10 @@ Which value of `df` would you select?
 
 ```{r}
 # YOUR CODE HERE
-recipe_spec_base  %>% 
-  prep() %>%
-  juice() %>%
+data_prepared_tbl %>%
   plot_time_series_regression(
     .date_var = purchased_at,
-    .formula  = revenue_trans ~ splines::ns(x =purchased_at_index.num, df = 3)
+    .formula  = revenue_trans ~ splines::ns(x = purchased_at, df = 3)
     )
 ```
 
@@ -424,8 +428,8 @@ Create a model specification for linear regression:
 
 ```{r}
 # YOUR CODE HERE
-model_spec_lm <- linear_reg(penalty = 0.01) %>%
-  set_engine("glm")
+model_spec_lm <- linear_reg() %>%
+  set_engine("lm")
 ```
 
 ### Recipe Spec - Spline
@@ -444,6 +448,8 @@ Create a recipe for the spline model.
 recipe_spec_1_spline <- recipe_spec_base %>%
   step_rm(purchased_at,starts_with("lag_")) %>%
   step_ns(purchased_at_index.num, deg_free = 3)
+
+recipe_spec_1_spline %>% prep() %>% juice() %>% glimpse()
 ```
 
 
@@ -463,6 +469,7 @@ workflow_fit_lm_1_spline <- workflow() %>%
   add_model(model_spec_lm) %>%
   add_recipe(recipe_spec_1_spline) %>%
   fit(data = training(splits))
+workflow_fit_lm_1_spline %>% extract_fit_parsnip() %>% pluck("fit") %>% summary()
 ```
 
 ## Rolling Lag Model
@@ -479,9 +486,12 @@ Create a recipe for the lag model.
 
 ```{r}
 # YOUR CODE HERE
-recipe_spec_1_lag <- recipe_spec_base %>%
+recipe_spec_2_lag <- recipe_spec_base %>%
   step_rm(purchased_at) %>%
+  step_rm(matches("(roll_4$)")) %>%
   step_naomit(starts_with("lag_"))
+
+recipe_spec_2_lag %>% prep() %>% juice() %>% glimpse()
 ```
 
 ### Workflow - Lag
@@ -492,8 +502,10 @@ Save the workflow as `workflow_fit_lm_2_lag`.
 # YOUR CODE HERE
 workflow_fit_lm_2_lag <- workflow() %>%
   add_model(model_spec_lm) %>%
-  add_recipe(recipe_spec_1_lag) %>%
+  add_recipe(recipe_spec_2_lag) %>%
   fit(data = training(splits))
+
+workflow_fit_lm_2_lag %>% extract_fit_parsnip() %>% pluck("fit") %>% summary()
 ```
 
 # Modeltime
@@ -517,6 +529,8 @@ Start by making a modeltime table:
 ```{r}
 # YOUR CODE HERE
 model_tbl <- modeltime_table(workflow_fit_lm_2_lag, workflow_fit_lm_1_spline)
+
+model_tbl
 ```
 
 As a precautionary measure, please refit the models using `modeltime_refit()`. This prevents models that can go bad over time because of software changes. 
@@ -540,6 +554,8 @@ Use testing data to calibrate the model:
 # YOUR CODE HERE
 calibration_tbl <- model_tbl %>%
   modeltime_calibrate(new_data = testing(splits))
+
+calibration_tbl
 ```
 
 ### Calculate the Accuracy
@@ -561,7 +577,11 @@ calibration_tbl %>%
 
 ```{r}
 # YOUR CODE HERE
-modeltime_forecast(object = model_tbl ,new_data = testing(splits), actual_data = data_prepared_tbl) %>%
+modeltime_forecast(
+  object      = model_tbl,
+  new_data    = testing(splits),
+  actual_data = data_prepared_tbl
+  ) %>%
   plot_modeltime_forecast()
 ```
 
@@ -620,7 +640,13 @@ refit_tbl %>%
     new_data    = forecast_tbl,
     actual_data = data_prepared_tbl
     ) %>%
-  mutate(across(.value:.conf_hi, ~standardize_inv_vec(., mean = std_mean, sd = std_sd))) %>%
+  mutate(across(
+    .value:.conf_hi,
+    ~standardize_inv_vec(
+      x    =.,
+      mean = std_mean,
+      sd   = std_sd)
+    ))%>%
   mutate(across(.value:.conf_hi, ~exp(.))) %>%
   plot_modeltime_forecast()
 ```
@@ -632,4 +658,57 @@ refit_tbl %>%
 
 - What do we think of these forecasts?
 - How can we further improve them? (HINT: what have competitors used that we haven't?)
+
+
+# BONUS
+## GLMNet - Elastic Net
+
+```{r}
+worflow_fit_glmnet_2_lag <- workflow_fit_lm_2_lag %>%
+  update_model(
+    spec = linear_reg(mode = "regression", penalty = 0.1, mixture = 0.5) %>%
+      set_engine("glmnet")
+  ) %>%
+  fit(data = training(splits))
+```
+
+
+```{r}
+calibration_tbl <- modeltime_table(
+  workflow_fit_lm_1_spline,
+  workflow_fit_lm_2_lag,
+  worflow_fit_glmnet_2_lag
+) %>%
+  update_model_description(.model_id = 1, "LM - Spline Recipe") %>%
+  update_model_description(.model_id = 2, "LM - Lag Recipe") %>%
+  update_model_description(.model_id = 3, "GLMNET - Lag Recipe") %>%
+  modeltime_calibrate(testing(splits))
+  
+```
+```{r}
+calibration_tbl %>%
+  modeltime_accuracy()
+```
+
+```{r}
+calibration_tbl %>%
+  modeltime_forecast(new_data    = testing(splits),
+                     actual_data = data_prepared_tbl) %>%
+  plot_modeltime_forecast()
+```
+
+
+```{r}
+refit_tbl <- calibration_tbl %>%
+  modeltime_refit(data = data_prepared_tbl)
+```
+
+
+
+```{r}
+refit_tbl %>%
+  modeltime_forecast(new_data    = forecast_tbl,
+                     actual_data = data_prepared_tbl) %>%
+  plot_modeltime_forecast()
+```
 
