@@ -51,19 +51,63 @@ splits %>%
 
 # * Parsnip Model (ARIMA)  ----
 
+traning(splits)
+
+
+model_fit_arima <- arima_reg() %>%
+  set_engine("auto_arima") %>%
+  fit(optins_trans ~ optin_time, data = training(splits))
+
+model_fit_arima
 
 # * Workflow (ARIMA + Date Features) ----
 
+model_spec_arima <- arima_reg() %>%
+  set_engine("auto_arima")
+
+recipe_spec_fourier <- recipe(optins_trans ~ optin_time, data = training(splits)) %>%
+  step_fourier(optin_time, period = c(7, 14, 30, 90), K = 1)
+
+recipe_spec_fourier %>% prep() %>% juice() %>% glimpse()
+
+workflow_fit_arima <- workflow() %>%
+  add_recipe(recipe_spec_fourier) %>%
+  add_model(model_spec_arima) %>%
+  fit(training(splits))
+
+workflow_fit_arima
 
 # * Workflow (GLMNET + XREGS) ----
 
+recipe_spec_2_lag
 
+recipe_spec_2_lag %>% prep() %>% juice() %>% glimpse()
 
+model_spec_glmnet <- linear_reg(
+  penalty = 0.1,
+  mixture = 0.5
+) %>%
+  set_engine("glmnet")
+
+workflow_fit_glmnet <- workflow() %>%
+  add_recipe(recipe_spec_2_lag) %>%
+  add_model(model_spec_glmnet) %>%
+  fit(training(splits))
+
+workflow_fit_glmnet
 
 # 2.0 MODELTIME TABLE ----
 # - Organize
 
-
+model_tbl <- modeltime_table(
+  model_fit_arima,
+  workflow_fit_arima,
+  workflow_fit_glmnet
+) %>%
+  update_model_description(
+    .model_id       = 3,
+    .new_model_desc = "GLMNET - Lag Recipe"
+  )
 
 # 3.0 CALIBRATION ----
 # - Calculates residual model errors on test set
