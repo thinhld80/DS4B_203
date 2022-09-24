@@ -109,15 +109,49 @@ model_tbl <- modeltime_table(
     .new_model_desc = "GLMNET - Lag Recipe"
   )
 
+model_tbl
+
 # 3.0 CALIBRATION ----
 # - Calculates residual model errors on test set
 # - Gives us a true prediction error estimate when we model with confidence intervals
 
+calibration_tbl <- model_tbl %>%
+  modeltime_calibrate(new_data = testing(splits))
 
+calibration_tbl %>%
+  slice(1) %>%
+  unnest(.calibration_data)
 
 # 4.0 TEST ACCURACY ----
 # - Calculates common accuracy measures
 # - MAE, MAPE, MASE, SMAPE, RMSE, R-SQUARED
+
+calibration_tbl %>%
+  modeltime_accuracy()
+
+
+# Tble Modeltime Accuracy
+calibration_tbl %>%
+  modeltime_accuracy(
+    metric_set = default_forecast_accuracy_metric_set()
+  ) %>%
+  table_modeltime_accuracy(
+    .interactive = TRUE,
+    bordered     = TRUE,
+    resizable    =TRUE
+  )
+
+# Metric Sets
+
+?default_forecast_accuracy_metric_set
+
+metric_set(mae, rmse, iic)
+
+calibration_tbl %>%
+  modeltime_accuracy(
+    metric_set = metric_set(mae, rmse, iic)
+  ) %>%
+  table_modeltime_accuracy()
 
 
 
