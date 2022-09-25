@@ -138,7 +138,7 @@ calibration_tbl %>%
   table_modeltime_accuracy(
     .interactive = TRUE,
     bordered     = TRUE,
-    resizable    =TRUE
+    resizable    = TRUE
   )
 
 # Metric Sets
@@ -158,10 +158,30 @@ calibration_tbl %>%
 # 5.0 TEST FORECAST ----
 # - Visualize the out-of-sample forecast
 
+calibration_tbl %>%
+  modeltime_forecast(
+    new_data      = testing(splits),
+    actual_data   = data_prepared_tbl,
+    conf_interval = 0.80
+  ) %>%
+  plot_modeltime_forecast(
+    .legend_max_width    = 60,
+    .legend_show         = FALSE,
+    .conf_interval_show  = TRUE,
+    .conf_interval_alpha = 0.10,
+    .conf_interval_fill  = "lightblue" ,
+    .title               = "Email Subscribers Forecast"
+  )
 
-# 6.0 REFITTING
+?plot_modeltime_forecast
+
+# 6.0 REFITTING ----
 
 # * Refit ----
+
+refit_tbl <- calibration_tbl %>%
+  modeltime_refit(data = data_prepared_tbl)
+
 
 
 # * Final Forecast ----
@@ -169,5 +189,17 @@ calibration_tbl %>%
 # - 'actual_data'
 # - Preprocessing
 
+refit_tbl %>%
+  modeltime_forecast(
+    #
+    new_data      = forecast_tbl,
+    actual_data   = data_prepared_tbl,
+    conf_interval = 0.80
+  ) %>%
+  plot_modeltime_forecast(
+    .legend_max_width   = 25,
+    .conf_interval_fill = "lightblue",
+    .interactive        = FALSE
+  )
 
 
