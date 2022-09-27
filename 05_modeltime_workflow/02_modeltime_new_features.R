@@ -41,7 +41,9 @@ splits <- data_prepared_tbl %>%
 # * Model Time Table ----
 #   - Fitted on Full Dataset (No Train/Test)
 
-model_fit_prophet <- prophet_reg() %>%
+model_fit_prophet <- prophet_reg(
+  seasonality_yearly = TRUE
+    ) %>%
   set_engine("prophet") %>%
   fit(optins_trans ~ optin_time, data = data_prepared_tbl)
 
@@ -59,41 +61,78 @@ workflow_fit_glmnet <- workflow() %>%
 
 model_tbl <- modeltime_table(
   model_fit_prophet,
-  workflow_fit_glmnet,
+  workflow_fit_glmnet
 )
 
 # * Make a Forecast ----
 #   - No confidence intervals
 
+model_tbl %>%
+  modeltime_forecast(
+    new_data    = forecast_tbl,
+    actual_data = data_prepared_tbl
+  ) %>%
+  plot_modeltime_forecast()
 
 # * Visualize a Fitted Model ----
 
-
+model_tbl %>%
+  modeltime_forecast(
+    new_data    = data_prepared_tbl,
+    actual_data = data_prepared_tbl
+  ) %>%
+  plot_modeltime_forecast()
 
 
 # 2.0 CALIBRATION (In-Sample vs Out-of-Sample) ----
 
 # * Refitting for Train/Test ----
 
+calibration_tbl <- model_tbl %>%
+  modeltime_refit(training(splits)) %>%
+  modeltime_calibrate(testing(splits))
 
 # * Accuracy ----
 
 # Out-of-Sample 
 
+calibration_tbl %>%
+  modeltime_accuracy()
 
 # In-Sample
 
+calibration_tbl %>%
+  modeltime_accuracy(
+    new_data = training(splits) %>% drop_na()
+  )
 
 # 3.0 RESIDUALS ----
+
+residuals_out_tbl <- calibration_tbl %>%
+  modeltime_residuals()
+
+residuals_in_tbl <- calibration_tbl %>%
+  modeltime_residuals(training(splits) %>% drop_na()
+                      )
 
 # * Time Plot ----
 
 # Out-of-Sample 
 
+residuals_out_tbl %>%
+  plot_modeltime_residuals(
+    .smooth      = TRUE,
+    .smooth_span = 1
+  )
+
 
 # In-Sample
 
-
+residuals_in_tbl %>%
+  plot_modeltime_residuals(
+    .smooth     = TRUE,
+    .smooth_span = 1
+    )
 
 # * ACF Plot ----
 
