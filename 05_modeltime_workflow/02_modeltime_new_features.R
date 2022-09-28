@@ -19,6 +19,7 @@ library(modeltime)
 # Core
 library(tidyverse)
 library(timetk)
+
 library(lubridate)
 
 # DATA & ARTIFACTS ----
@@ -112,8 +113,7 @@ residuals_out_tbl <- calibration_tbl %>%
   modeltime_residuals()
 
 residuals_in_tbl <- calibration_tbl %>%
-  modeltime_residuals(training(splits) %>% drop_na()
-                      )
+  modeltime_residuals(training(splits) %>% drop_na())
 
 # * Time Plot ----
 
@@ -121,8 +121,10 @@ residuals_in_tbl <- calibration_tbl %>%
 
 residuals_out_tbl %>%
   plot_modeltime_residuals(
-    .smooth      = TRUE,
-    .smooth_span = 1
+    .smooth            = TRUE,
+    .smooth_span       = 1,
+    .y_intercept       = 0,
+    .y_intercept_color = "blue"
   )
 
 
@@ -138,14 +140,33 @@ residuals_in_tbl %>%
 
 # Out-of-Sample 
 
+residuals_out_tbl %>%
+  plot_modeltime_residuals(
+    .type = "acf"
+  )
 
 # In-Sample
 
-
+residuals_in_tbl %>%
+  plot_modeltime_residuals(
+    .type = "acf"
+  )
 
 # * Seasonality ----
 
 # Out-of-Sample 
+
+residuals_out_tbl %>%
+  plot_modeltime_residuals(
+    .type = "seasonality"
+  )
+
+calibration_tbl %>%
+  modeltime_forecast(
+                     new_data    = testing(splits),
+                     actual_data = data_prepared_tbl
+                     ) %>%
+  plot_modeltime_forecast()
 
 
 # In-Sample
