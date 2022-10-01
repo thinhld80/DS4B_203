@@ -152,12 +152,35 @@ lm(optins_trans ~ lag_vec(optins_trans, 1)
 
 # 2.0 ARIMA ----
 
+model_fit_arima <- arima_reg(
+  seasonal_period          = 7,
+  non_seasonal_ar          = 1,
+  non_seasonal_differences = 1,
+  non_seasonal_ma          = 1,
+  seasonal_ar              = 1,
+  seasonal_differences     = 1,
+  seasonal_ma              = 1 
+  )  %>%
+  set_engine("arima") %>%
+  fit(optins_trans ~ optin_time, training(splits))
 
+modeltime_table(
+  model_fit_arima
+) %>%
+  modeltime_calibrate(testing(splits))%>%
+  modeltime_forecast(
+    new_data    = testing(splits),
+    actual_data = data_prepared_tbl
+  ) %>%
+  plot_modeltime_forecast()
 
 # 3.0 AUTO ARIMA + XREGS ----
 
 # * Model ----
 
+arima_reg() %>%
+  set_engine("auto_arima") %>%
+  fit(optins_trans ~ optin_time, data = training(splits))
 
 # * Calibrate ----
 
