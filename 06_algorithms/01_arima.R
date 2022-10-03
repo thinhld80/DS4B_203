@@ -239,3 +239,11 @@ refit_tbl %>%
 # - Can only use 1 seasonality by default (XREGs can help go beyond 1 seasonality)
 # - Becomes erratic with too many lags
 # - Requires Expensive Parameter Search 
+
+model_fit_best_arima <- calibration_tbl %>%
+  slice(2) %>%
+  pull(.model) %>%
+  pluck(1)
+
+write_rds(model_fit_best_arima, "00_models/model_best_fit_arima.rds")
+read_rds("00_models/model_best_fit_arima.rds")
